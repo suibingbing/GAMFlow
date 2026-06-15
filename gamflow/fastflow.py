@@ -1,3 +1,10 @@
+from pathlib import Path
+import sys
+
+THIRD_PARTY_DIR = Path(__file__).resolve().parents[1] / "third_party"
+if str(THIRD_PARTY_DIR) not in sys.path:
+    sys.path.insert(0, str(THIRD_PARTY_DIR))
+
 import FrEIA.framework as Ff
 import FrEIA.modules as Fm
 import timm
@@ -5,9 +12,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import constants as const
+from gamflow import constants as const
 
-from SAM import simam_module as CBAM
+from gamflow.attention.simam import simam_module as CBAM
 
 def subnet_cbam_func(kernel_size, hidden_ratio):
     def subnet_conv(in_channels, out_channels):

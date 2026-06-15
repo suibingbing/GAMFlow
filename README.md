@@ -9,13 +9,21 @@ Code package related to **GAMFlow: Global Attention-Based Flow Model for Anomaly
 - Journal: IEEE Access, 2023
 - DOI: https://doi.org/10.1109/ACCESS.2023.3326753
 
-This repository is based on an unofficial PyTorch implementation of [_FastFlow: Unsupervised Anomaly Detection and Localization via 2D Normalizing Flows_](https://arxiv.org/abs/2111.07677) (Jiawei Yu et al.) and includes related attention modules such as GAM, CBAM, and SimAM.
+## Overview
 
-As the paper doesn't give all implementation details, it's kinda difficult to reproduce its result. A very close AUROC is achieved in this repo. But there are still some confusions and a lot of guesses:
-- [ ] [Unmatched model A.d. parameter](https://github.com/gathierry/FastFlow/issues/2)
-- [ ] [Unmentioned but critical LayerNorm](https://github.com/gathierry/FastFlow/issues/3)
+GAMFlow is an unsupervised industrial anomaly detection and localization model based on feature extraction and flow-based distribution estimation. This repository is organized around a FastFlow-style normalizing-flow backbone, with related attention modules retained for experiments:
 
-_Really appreciate the inspiring [discussion](https://github.com/AlessioGalluccio/FastFlow/issues/14) with the community. Feel free to comment, raise new issues or PRs._
+- `gamflow/attention/gam.py`: Global Attention Mechanism module.
+- `gamflow/attention/cbam.py`: Convolutional Block Attention Module.
+- `gamflow/attention/simam.py`: SimAM attention module currently wired into `gamflow/fastflow.py`.
+
+## Repository Contents
+
+- `scripts/train.py`: main training and evaluation entry point.
+- `gamflow/`: model, dataset, constants, utilities, and attention modules.
+- `configs/`: backbone and flow configuration files.
+- `third_party/FrEIA/`: vendored FrEIA implementation used for invertible flow blocks.
+- `requirements.txt`: Python dependency list.
 
 ## Installation
 
@@ -24,51 +32,44 @@ pip install -r requirements.txt
 ```
 
 ## Data
-We use [MVTec-AD](https://www.mvtec.com/company/research/datasets/mvtec-ad) to verify the performance.
 
-The dataset is organized in the following structure:
+This project uses [MVTec AD](https://www.mvtec.com/company/research/datasets/mvtec-ad). The dataset should be arranged as:
+
+```text
+mvtec-ad/
+  bottle/
+    train/
+    test/
+    ground_truth/
+  cable/
+    train/
+    test/
+    ground_truth/
+  ...
 ```
-mvtec-ad
-|- bottle
-|  |- train
-|  |- test
-|  |- ground_truth
-|- cable
-|  |- train
-|  |- test
-|  |- ground_truth
-...
-```
-## Train and eval
-Take ResNet18 as example
+
+## Usage
+
+Train a category:
+
 ```bash
-# train
-python main.py -cfg configs/cait.yaml --data ../data -cat bottle
-# a folder named _fastflow_experiment_checkpoints will be created automatically to save checkpoints
-
-# eval
-python main.py --cfg configs/resnet18.yaml --data path/to/mvtec-ad -cat [category] --eval -ckpt _fastflow_experiment_checkpoints/exp[index]/[epoch#].pt
+python scripts/train.py -cfg configs/cait.yaml --data /path/to/mvtec-ad -cat bottle
 ```
 
-## Performance
-As the training process is not stable, I paste both the performance of the last (500th) epoch and the best epoch.
+Evaluate a checkpoint:
 
-| AUROC (last/best) | wide-resnet-50 | resnet18        | DeiT            | CaiT            |
-| ----------------- | -------------- | --------------- | --------------- |-----------------|
-| bottle            | 0.987/0.989    | 0.975/0.979     | 0.931/0.959     | 0.926/0.976     |
-| cable             | 0.950/0.978    | 0.942/0.962     | 0.976/0.979     | 0.975/0.981     |
-| capsule           | 0.987/0.989    | 0.979/0.985     | 0.982/0.988     | 0.987/0.990     |
-| carpet            | 0.988/0.989    | 0.986/0.986     | 0.991/0.994     | 0.981/0.993     |
-| grid              | 0.991/0.993    | 0.973/0.985     | 0.965/0.980     | 0.968/0.970     |
-| hazel nut         | 0.957/0.984    | 0.922/0.963     | 0.982/0.990     | 0.981/0.992     |
-| leather           | 0.995/0.996    | 0.991/0.996     | 0.991/0.994     | 0.994/0.996     |
-| metal nut         | 0.968/0.986    | 0.950/0.966     | 0.980/0.988     | 0.977/0.984     |
-| pill              | 0.968/0.977    | 0.955/0.968     | 0.977/0.989     | 0.984/0.990     |
-| screw             | 0.969/0.987    | 0.952/0.957     | 0.990/0.990     | 0.991/0.993     |
-| tile              | 0.955/0.971    | 0.916/0.951     | 0.966/0.966     | 0.946/0.972     |
-| toothbrush        | 0.985/0.986    | 0.967/0.978     | 0.983/0.988     | 0.989/0.992     |
-| transistor        | 0.956/0.975    | 0.970/0.975     | 0.959/0.970     | 0.967/0.969     |
-| wood              | 0.948/0.964    | 0.894/0.954     | 0.960/0.963     | 0.950/0.959     |
-| zipper            | 0.980/0.987    | 0.969/0.979     | 0.966/0.974     | 0.972/0.984     |
-| __MEAN__          | __0.972/0.983__ | __0.956/0.972__ | __0.973/0.981__ | __0.973/0.983__ |
-| Paper             | 0.981          | 0.972           | 0.981           | 0.985           |
+```bash
+python scripts/train.py \
+  --cfg configs/resnet18.yaml \
+  --data /path/to/mvtec-ad \
+  -cat bottle \
+  --eval \
+  -ckpt /path/to/checkpoint.pt
+```
+
+The script reports image-level and pixel-level AUROC during evaluation.
+
+## Notes
+
+- The original working directory included `main2.py` and `main90090.py`; those were removed because they were duplicate/debug variants of `scripts/train.py`.
+- Large datasets and checkpoints are not committed.

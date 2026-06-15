@@ -1,30 +1,27 @@
 import argparse
 import os
-from sklearn import metrics as metricss
+
 import torch
 import yaml
-from ignite.contrib import metrics 
-import constants as const
-import dataset
-import fastflow
-import utils
-import pickle
-import pandas as pd
+from ignite.contrib import metrics
+
+from gamflow import constants as const
+from gamflow import dataset
+from gamflow import fastflow
+from gamflow import utils
+
 import warnings
 warnings.filterwarnings("ignore")
 from sklearn.metrics import roc_auc_score
 import numpy as np
 import random
-import json
-#torch.backends.cudnn.benchmark=True
-listauc_image=[]
-listauc_piexl=[]
-
-dic_output={}
-dic_target={}
-#mps = torch.device('mps')
-torch.cuda.is_available()
 torch.backends.cudnn.benchmark=True
+device = torch.device('cuda:0')  # 0表示第0号显卡
+torch.cuda.set_device(0)  # 设置当前设备为第0号显卡
+listauc_image=[]
+listindex=[]
+listauc_piexl=[]
+listacc=[]
 
 def setup_seed(seed):
     torch.manual_seed(seed)
@@ -41,6 +38,8 @@ def build_train_data_loader(args, config):
         input_size=config["input_size"],
         is_train=True,
     )
+    print("category:",args.category)
+    listindex.append(args.category)
     return torch.utils.data.DataLoader(
         train_dataset,
         batch_size=const.BATCH_SIZE,
@@ -57,11 +56,12 @@ def build_test_data_loader(args, config):
         input_size=config["input_size"],
         is_train=False,
     )
+    print("category:",args.category)
     return torch.utils.data.DataLoader(
         test_dataset,
         batch_size=const.BATCH_SIZE,
         shuffle=False,
-        num_workers=0,
+        num_workers=4,
         drop_last=False,
     )
 
@@ -79,6 +79,8 @@ def build_model(config):
             sum(p.numel() for p in model.parameters() if p.requires_grad)
         )
     )
+    print("step:",config["flow_step"])
+    listindex.append(config["flow_step"])
     return model
 
 
@@ -93,7 +95,7 @@ def train_one_epoch(dataloader, model, optimizer, epoch):
     loss_meter = utils.AverageMeter()
     for step, data in enumerate(dataloader):
         # forward
-        data = data.cuda()
+        data = data.cuda(device)
         ret = model(data)
         loss = ret["loss"]
         # backward
@@ -102,27 +104,16 @@ def train_one_epoch(dataloader, model, optimizer, epoch):
         optimizer.step()
         # log
         loss_meter.update(loss.item())
-        if (step + 1) % const.LOG_INTERVAL == 0 or (step + 1) == len(dataloader):
-            print(
-                "Epoch {} - Step {}: loss = {:.3f}({:.3f})".format(
-                    epoch + 1, step + 1, loss_meter.val, loss_meter.avg
-                )
-            )
-# def save_roc(mydict,n):
-#     # 1. json.dumps(字典)：将字典转为JSON字符串，indent为多行缩进空格数，
-#     # sort_keys为是否按键排序,ensure_ascii=False为不确保ascii，及不将中文等特殊字符转为\uXXX等
-#     if n==0:
-#         with open("outputcbam3.json", "w", encoding='utf-8') as f:
-#         # json.dump(dict_, f)  # 写为一行
-#            json.dump(mydict, f)  # 写为多行
-#     else:
-#         with open("targetcbam3.json", "w", encoding='utf-8') as f:
-#         # json.dump(dict_, f)  # 写为一行
-#            json.dump(mydict, f)  # 写为多行
+        # if (step + 1) % const.LOG_INTERVAL == 0 or (step + 1) == len(dataloader):
+        #     print(
+        #         "Epoch {} - Step {}: loss = {:.3f}({:.3f})".format(
+        #             epoch + 1, step + 1, loss_meter.val, loss_meter.avg
+        #         )
+        #     )
+
 def get_detection_auroc(preds, mask):
     image_score = np.max(preds, axis=(1, 2, 3))
     label = np.max(mask, axis=(1, 2, 3))
-    print(image_score,preds)
     auroc = roc_auc_score(label, image_score)
     return auroc
 def get_accuracy(preds, mask):
@@ -136,106 +127,67 @@ def get_accuracy(preds, mask):
     accuracy = (binary_preds == mask).mean()
     return accuracy
 
-def eval_once(dataloader, model):
+def eval_once(dataloader, model,epoch):
+    print("epoch: {}".format(epoch))
     model.eval()
-    # auroc_metric = metrics.ROC_AUC()
-    # auroc_metric2=mec.ROC_AUC()
-    arr=np.array([])
-    arr2=np.array([])
     A = []
     B = []
+    auroc_metric = metrics.ROC_AUC()
     for data, targets in dataloader:
-        data, targets = data.cuda(), targets.cuda()
+        data, targets = data.cuda(device), targets.cuda(device)
         with torch.no_grad():
             ret = model(data)
         outputs = ret["anomaly_map"].cpu().detach()
         A.append(targets.cpu().numpy())
         B.append(outputs.cpu().numpy())
+        outputs = outputs.flatten()
+        targets = targets.flatten()
+        list2=targets
+        list2 =list(map(int,list2))
+        targets=torch.tensor(list2)
+        auroc_metric.update((outputs, targets))
+    auroc = auroc_metric.compute()
     GT = np.concatenate(A, axis=0)    
-    pred = np.concatenate(B, axis=0)    
-    print(get_detection_auroc(pred,GT))
-    listac.append(get_detection_auroc(pred,GT))
-        # for i in range(0,len(targets)):
-        #     if torch.equal(targets[i][0],target2[0])==True:
-        #         list1.append(1)
-        #     else:
-        #         list1.append(0)
-        # for i in range(0,len(outputs)):
-        #     if torch.equal(outputs[i][0],target3[0])==True:
-        #         list2.append(1)
-        #     else:
-        #         list2.append(0)
-        
-        # outputs = outputs.flatten()
-        # targets = targets.flatten()
-        # list2=targets
-        # list2 =list(map(int,list2))
-        # targets=torch.tensor(list2)
-        # output2 = outputs.numpy()
-        # target2 = targets.cpu().numpy()
-        # arr=np.append(arr,output2)
-        # arr2=np.append(arr2,target2)
-        #target2= targets.flatten()
-        #targets=targets.cpu().numpy()
-        #fpr, tpr, thresholds = metricss.roc_curve(targets, outputs,target2)
-        #print(fpr,tpr,thresholds)
-        #targets=targets.cpu().numpy()
-        #fpr, tpr, thresholds = metricss.roc_curve(targets, outputs)
-        # auroc_metric.update((outputs, targets))
-        #print(fpr,tpr,thresholds)
-    '''''
-    'argon2:$argon2id$v=19$m=10240,t=10,p=8$umBHs/9mxRqY7APihw4Hkg$leerDiBZVB46qTJr6LjqlEdVeqxfgdP1i4TgXaOwGwk'
-    print(list1)
-    print(len(list1))
-    print(list2)
-    print(len(list2))
-    '''
-    # auroc = auroc_metric.compute()
-    # print("AUROC: {}".format(auroc))
-    # listac.append(auroc)
-    # l=str(len(listac)*10)
-    # list1 = arr.tolist()
-    # list2 = arr2.tolist()
-    # dic_target[l]=list2
-    # dic_output[l]=list1
-    #if max(listac)==auroc:
-        #save_roc(dic_output,0)
-        #save_roc(dic_target,1)
-
+    pred = np.concatenate(B, axis=0) 
+    auroc2=get_detection_auroc(pred,GT)
+    print("AUROC-image: {}".format(auroc2))
+    listauc_image.append(auroc2)
+    print("AUROC-piexl: {}".format(auroc))
+    listauc_piexl.append(auroc)
+    acc= get_accuracy(pred,GT)
+    # print("ACC: {}".format(acc))
+    # listacc.append(acc)
+    
 
 
 def train(args):
-    os.makedirs(const.CHECKPOINT_DIR, exist_ok=True)
-    checkpoint_dir = os.path.join(
-        const.CHECKPOINT_DIR, "exp%d" % len(os.listdir(const.CHECKPOINT_DIR))
-    )
-    #os.makedirs(checkpoint_dir, exist_ok=True)
+    # os.makedirs(const.CHECKPOINT_DIR, exist_ok=True)
+    # checkpoint_dir = os.path.join(
+    #     const.CHECKPOINT_DIR, "exp%d" % len(os.listdir(const.CHECKPOINT_DIR))
+    # )
+    # os.makedirs(checkpoint_dir, exist_ok=True)
 
     config = yaml.safe_load(open(args.config, "r"))
     model = build_model(config)
     optimizer = build_optimizer(model)
+
     train_dataloader = build_train_data_loader(args, config)
     test_dataloader = build_test_data_loader(args, config)
-    model.cuda()
+    model.cuda(device)
 
     for epoch in range(const.NUM_EPOCHS):
         train_one_epoch(train_dataloader, model, optimizer, epoch)
-        if (epoch + 1) % 1== 0: # 10
-            eval_once(test_dataloader, model)
-            '''
-        if (epoch + 1) % const.CHECKPOINT_INTERVAL == 0:
-
-            torch.save(
-                {
-                    "epoch": epoch,
-                    "model_state_dict": model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                },
-                os.path.join(checkpoint_dir, "%d.pt" % epoch),
-            )
-            '''
-            
-            
+        if (epoch + 1) % const.EVAL_INTERVAL == 0:
+            eval_once(test_dataloader, model, epoch)
+        # if (epoch + 1) % const.CHECKPOINT_INTERVAL == 0:
+        #     torch.save(
+        #         {
+        #             "epoch": epoch,
+        #             "model_state_dict": model.state_dict(),
+        #             "optimizer_state_dict": optimizer.state_dict(),
+        #         },
+        #         os.path.join(checkpoint_dir, "%d.pt" % epoch),
+        #     )
 
 
 def evaluate(args):
@@ -244,7 +196,7 @@ def evaluate(args):
     checkpoint = torch.load(args.checkpoint)
     model.load_state_dict(checkpoint["model_state_dict"])
     test_dataloader = build_test_data_loader(args, config)
-    model.cuda()
+    model.cuda(device)
     eval_once(test_dataloader, model)
 
 
@@ -276,8 +228,13 @@ if __name__ == "__main__":
         evaluate(args)
     else:
         train(args)
-t=max(listac)
-a=(listac.index(t)+1)
-print(t,a)
-#save_roc(dic_output,0)
-#save_roc(dic_target,1)
+t1=max(listauc_image)
+t2=max(listauc_piexl)
+# t3=max(listacc)
+a1=(listauc_image.index(t1)+1)*10
+a2=(listauc_piexl.index(t2)+1)*10
+print(listindex)
+# a3=(listacc.index(t3)+1)*10
+print("AUROC-image-best: {}".format(t1),"epoch: {}".format(a1))
+print("AUROC-piexl-best: {}".format(t2),"epoch: {}".format(a2))
+# print("ACC-best: {}".format(t3),"epoch: {}".format(a3))

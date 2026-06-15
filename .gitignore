@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# OS/editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Runtime outputs
+_fastflow_experiment_checkpoints/
+checkpoints/
+outputs/
+runs/
+*.pt
+*.pth
+*.ckpt
+
+# Datasets
+data/
+mvtec-ad/
