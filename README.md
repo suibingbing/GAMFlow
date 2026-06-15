@@ -13,6 +13,10 @@ Code package related to **GAMFlow: Global Attention-Based Flow Model for Anomaly
 
 GAMFlow is an unsupervised industrial anomaly detection and localization model based on feature extraction and flow-based distribution estimation. This repository is organized around a FastFlow-style normalizing-flow backbone, with related attention modules retained for experiments:
 
+![GAMFlow overview](assets/gamflow_overview.png)
+
+Figure source: Zhang et al., "GAMFlow: Global Attention-Based Flow Model for Anomaly Detection and Localization," IEEE Access, 2023.
+
 - `gamflow/attention/gam.py`: Global Attention Mechanism module.
 - `gamflow/attention/cbam.py`: Convolutional Block Attention Module.
 - `gamflow/attention/simam.py`: SimAM attention module currently wired into `gamflow/fastflow.py`.
