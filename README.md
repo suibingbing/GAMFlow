@@ -2,6 +2,13 @@
 
 Code package related to **GAMFlow: Global Attention-Based Flow Model for Anomaly Detection and Localization**.
 
+## Paper
+
+- Title: GAMFlow: Global Attention-Based Flow Model for Anomaly Detection and Localization
+- Authors: Fan Zhang, Ruiqing Yan, Jinfeng Li, Jiasheng He, Chun Fang
+- Journal: IEEE Access, 2023
+- DOI: https://doi.org/10.1109/ACCESS.2023.3326753
+
 This repository is based on an unofficial PyTorch implementation of [_FastFlow: Unsupervised Anomaly Detection and Localization via 2D Normalizing Flows_](https://arxiv.org/abs/2111.07677) (Jiawei Yu et al.) and includes related attention modules such as GAM, CBAM, and SimAM.
 
 As the paper doesn't give all implementation details, it's kinda difficult to reproduce its result. A very close AUROC is achieved in this repo. But there are still some confusions and a lot of guesses:
@@ -65,4 +72,3 @@ As the training process is not stable, I paste both the performance of the last 
 | zipper            | 0.980/0.987    | 0.969/0.979     | 0.966/0.974     | 0.972/0.984     |
 | __MEAN__          | __0.972/0.983__ | __0.956/0.972__ | __0.973/0.981__ | __0.973/0.983__ |
 | Paper             | 0.981          | 0.972           | 0.981           | 0.985           |
-
